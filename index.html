@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Attendance Filter & Salary Summary</title>
+
+<!-- Google Material Icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+    }
+
+    h2 {
+        margin-bottom: 10px;
+    }
+
+    .filter-box {
+        padding: 15px;
+        background: #f1f1f1;
+        margin-bottom: 20px;
+        border-radius: 8px;
+    }
+
+    label {
+        margin-right: 8px;
+
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    th, td {
+        padding: 8px;
+        border: 1px solid #555;
+        text-align: left;
+    }
+
+    th {
+        background: #e6e6e6;
+    }
+
+    .btn {
+        background: #2196f3;
+        color: white;
+        padding: 7px 15px;
+
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+
+    .btn:hover {
+        background: #0b7dda;
+    }
+</style>
+</head>
+<body>
+
+<h2><span class="material-icons">construction</span> Attendance Filter System</h2>
+
+<div class="filter-box">
+    <label><b>Start Date:</b></label>
+    <input type="date" id="startDate">
+
+    <label><b>End Date:</b></label>
+    <input type="date" id="endDate">
+
+    <label><b>Worker ID:</b></label>
+    <input type="text" id="workerID" placeholder="Optional">
+
+    <button class="btn" onclick="filterData()">Filter</button>
+    <button class="btn" onclick="openSummary()">Open Summary</button>
+</div>
+
+<table id="dataTable">
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>Worker ID</th>
+            <th>Worker Name</th>
+            <th>Designation</th>
+            <th>Day Salary</th>
+            <th>Date</th>
+            <th>Attended</th>
+            <th>OT</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+// -------- CSV GOOGLE SHEET LINK ----------
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeMfVC0OT9CSn4ShLoMNqfZ3pFD5RlkS2dCj1jdfjzvvvGYWOSUy5Mr-zdQ97lb96sjnoXZh5zFaCP/pub?output=csv";
+
+let data = [];
+
+// -------- LOAD CSV DATA ----------
+fetch(CSV_URL)
+    .then(res => res.text())
+    .then(csv => {
+        data = csv.split("\n").map(row => row.split(","));
+        data.shift(); // header remove
+        loadTable(data);
+    });
+
+// -------- LOAD TABLE ----------
+function loadTable(dataset) {
+    const tbody = document.querySelector("#dataTable tbody");
+    tbody.innerHTML = "";
+
+    dataset.forEach(row => {
+        if (row.length < 8) return;
+
+        let tr = document.createElement("tr");
+        row.forEach(col => {
+            let td = document.createElement("td");
+            td.textContent = col.trim();
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+// -------- FILTER FUNCTION ----------
+function filterData() {
+    const start = document.getElementById("startDate").value;
+    const end = document.getElementById("endDate").value;
+    const worker = document.getElementById("workerID").value.trim();
+
+    let filtered = data.filter(row => {
+        let date = row[5].replace(/\s/g, ""); // avoid formatting issue
+
+        let d = date.split("/"); // dd/mm/yyyy
+        if (d.length === 3) {
+            date = `${d[2]}-${d[1]}-${d[0]}`;
+        }
+
+        let dateCheck =
+            (!start || date >= start) &&
+            (!end || date <= end);
+
+        let workerCheck = (!worker || row[1] === worker);
+
+        return dateCheck && workerCheck;
+    });
+
+    loadTable(filtered);
+}
+
+// --------- SUMMARY PAGE ----------
+function openSummary() {
+    const start = document.getElementById("startDate").value;
+    const end = document.getElementById("endDate").value;
+
+    let filtered = data.filter(row => {
+        let date = row[5].replace(/\s/g, "");
+        let d = date.split("/");
+        if (d.length === 3) date = `${d[2]}-${d[1]}-${d[0]}`;
+        return (!start || date >= start) && (!end || date <= end);
+    });
+
+    let workers = {};
+
+    filtered.forEach(r => {
+        let id = r[1];
+        let name = r[2];
+        let des = r[3];
+        let salary = Number(r[4]);
+        let att = Number(r[6]);
+        let ot = Number(r[7]);
+
+        if (!workers[id]) workers[id] = {
+            id, name, des, salary,
+            totalAttend: 0,
+            totalOT: 0
+        };
+
+        workers[id].totalAttend += att;
+        workers[id].totalOT += ot;
+    });
+
+    let summaryHTML = `
+    <html>
+    <head>
+    <title>Salary Summary</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body { font-family: Arial; padding: 20px; }
+
+        .header {
+            background: #2196f3;
+            padding: 20px;
+            color: white;
+            border-radius: 10px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sub {
+            margin-top: 5px;
+            font-size: 14px;
+
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
+
+        th, td {
+            border: 1px solid #555;
+            padding: 8px;
+        }
+
+        th {
+            background: #e6e6e6;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .print-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #2196f3;
+            color: white;
+
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+    </head>
+    <body>
+
+    <div class="header">
+        <h1><span class="material-icons">construction</span> Sohanur Construction & Manpower Solution</h1>
+        <div class="sub">
+            Email: sohanurconstructionltd@gmail.com | Phone: 01805-090910, 01805-090920
+        </div>
+        <h3>Worker Salary Report: ${start} to ${end}</h3>
+    </div>
+
+    <table>
+        <tr>
+            <th>Worker ID</th>
+
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Total Attend</th>
+            <th>Day Salary</th>
+            <th>Attend Salary</th>
+            <th>Total OT</th>
+            <th>OT Rate</th>
+            <th>OT Amount</th>
+            <th>Total Salary</th>
+        </tr>`;
+
+    let grandTotal = 0;
+
+    Object.values(workers).forEach(w => {
+        let attendSalary = w.totalAttend * w.salary;
+        let otRate = w.salary / 8;
+        let otAmount = w.totalOT * otRate;
+        let total = attendSalary + otAmount;
+
+        grandTotal += total;
+
+        summaryHTML += `
+        <tr>
+            <td>${w.id}</td>
+            <td>${w.name}</td>
+            <td>${w.des}</td>
+            <td>${w.totalAttend}</td>
+            <td>${w.salary}</td>
+            <td>${attendSalary}</td>
+            <td>${w.totalOT}</td>
+            <td>${otRate.toFixed(2)}</td>
+            <td>${otAmount.toFixed(2)}</td>
+            <td>${total.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    summaryHTML += `
+    </table>
+
+    <h2>Total Workers Salary: ${grandTotal.toFixed(2)} BDT</h2>
+
+    <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+
+    <div class="footer">© Sohanur Construction & Manpower Solution</div>
+
+    </body>
+    </html>`;
+
+    let win = window.open("");
+    win.document.write(summaryHTML);
+}
+</script>
+
+</body>
+</html>
