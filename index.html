@@ -6,15 +6,10 @@
 <!-- Google Material Icons -->
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-
 <style>
     body {
         font-family: Arial, sans-serif;
         padding: 20px;
-    }
-
-    h2 {
-        margin-bottom: 10px;
     }
 
     .filter-box {
@@ -22,11 +17,6 @@
         background: #f1f1f1;
         margin-bottom: 20px;
         border-radius: 8px;
-    }
-
-    label {
-        margin-right: 8px;
-
     }
 
     table {
@@ -49,7 +39,6 @@
         background: #2196f3;
         color: white;
         padding: 7px 15px;
-
         border: none;
         border-radius: 6px;
         cursor: pointer;
@@ -95,22 +84,31 @@
     <tbody></tbody>
 </table>
 
+
 <script>
-// -------- CSV GOOGLE SHEET LINK ----------
+// ---------- CSV GOOGLE SHEET -------------
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeMfVC0OT9CSn4ShLoMNqfZ3pFD5RlkS2dCj1jdfjzvvvGYWOSUy5Mr-zdQ97lb96sjnoXZh5zFaCP/pub?output=csv";
 
 let data = [];
 
-// -------- LOAD CSV DATA ----------
+// LOAD CSV
 fetch(CSV_URL)
     .then(res => res.text())
     .then(csv => {
-        data = csv.split("\n").map(row => row.split(","));
-        data.shift(); // header remove
+        data = csv.split("\n").map(r => r.split(","));
+        data.shift(); 
         loadTable(data);
     });
 
-// -------- LOAD TABLE ----------
+// TEXT DATE → REAL DATE
+function fixDate(dateText) {
+    if (!dateText) return null;
+    let d = dateText.trim().split("/");
+    if (d.length !== 3) return null; 
+    return new Date(`${d[2]}-${d[1]}-${d[0]}`);  // yyyy-mm-dd
+}
+
+// LOAD TABLE
 function loadTable(dataset) {
     const tbody = document.querySelector("#dataTable tbody");
     tbody.innerHTML = "";
@@ -128,42 +126,42 @@ function loadTable(dataset) {
     });
 }
 
-// -------- FILTER FUNCTION ----------
+// FILTER DATA
 function filterData() {
     const start = document.getElementById("startDate").value;
     const end = document.getElementById("endDate").value;
     const worker = document.getElementById("workerID").value.trim();
 
     let filtered = data.filter(row => {
-        let date = row[5].replace(/\s/g, ""); // avoid formatting issue
+        let rowDate = fixDate(row[5]);
+        if (!rowDate) return false;
 
-        let d = date.split("/"); // dd/mm/yyyy
-        if (d.length === 3) {
-            date = `${d[2]}-${d[1]}-${d[0]}`;
-        }
+        let matchDate =
+            (!start || rowDate >= new Date(start)) &&
+            (!end || rowDate <= new Date(end));
 
-        let dateCheck =
-            (!start || date >= start) &&
-            (!end || date <= end);
+        let matchWorker =
+            (!worker || row[1] === worker);
 
-        let workerCheck = (!worker || row[1] === worker);
-
-        return dateCheck && workerCheck;
+        return matchDate && matchWorker;
     });
 
     loadTable(filtered);
 }
 
-// --------- SUMMARY PAGE ----------
+
+// OPEN SUMMARY PAGE
 function openSummary() {
+
     const start = document.getElementById("startDate").value;
     const end = document.getElementById("endDate").value;
 
     let filtered = data.filter(row => {
-        let date = row[5].replace(/\s/g, "");
-        let d = date.split("/");
-        if (d.length === 3) date = `${d[2]}-${d[1]}-${d[0]}`;
-        return (!start || date >= start) && (!end || date <= end);
+        let rowDate = fixDate(row[5]);
+        if (!rowDate) return false;
+
+        return (!start || rowDate >= new Date(start)) &&
+               (!end || rowDate <= new Date(end));
     });
 
     let workers = {};
@@ -177,142 +175,154 @@ function openSummary() {
         let ot = Number(r[7]);
 
         if (!workers[id]) workers[id] = {
-            id, name, des, salary,
-            totalAttend: 0,
-            totalOT: 0
+            id, name, des, salary, totalAttend: 0, totalOT: 0
         };
 
         workers[id].totalAttend += att;
         workers[id].totalOT += ot;
     });
 
-    let summaryHTML = `
-    <html>
-    <head>
-    <title>Salary Summary</title>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <style>
-        body { font-family: Arial; padding: 20px; }
 
-        .header {
-            background: #2196f3;
-            padding: 20px;
-            color: white;
-            border-radius: 10px;
-        }
+// ====================== SUMMARY HTML ======================
+let summaryHTML = `
+<html>
+<head>
+<title>Salary Summary</title>
 
-        .header h1 {
-            margin: 0;
-            font-size: 26px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-        .sub {
-            margin-top: 5px;
-            font-size: 14px;
+<style>
+body { font-family: Arial; padding: 20px; }
 
-        }
+/* PRINT FIXED HEADER + FOOTER */
+@media print {
+    .header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 25px;
-        }
+    .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 14px;
+        opacity: 0.7;
+    }
 
-        th, td {
-            border: 1px solid #555;
-            padding: 8px;
-        }
+    body { margin-top: 180px; margin-bottom: 60px; }
+}
 
-        th {
-            background: #e6e6e6;
-        }
+.header {
+    background: #2196f3;
+    padding: 20px;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 10px;
+}
 
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            font-size: 14px;
-            opacity: 0.7;
-        }
+.header img {
+    width: 120px;
+}
 
-        .print-btn {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #2196f3;
-            color: white;
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 25px;
+}
 
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-    </style>
-    </head>
-    <body>
+th, td {
+    border: 1px solid #555;
+    padding: 8px;
+}
 
-    <div class="header">
+th {
+    background: #e6e6e6;
+}
+
+.print-btn {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: #2196f3;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+</style>
+
+</head>
+<body>
+
+<div class="header">
+    <div>
         <h1><span class="material-icons">construction</span> Sohanur Construction & Manpower Solution</h1>
-        <div class="sub">
-            Email: sohanurconstructionltd@gmail.com | Phone: 01805-090910, 01805-090950
-        </div>
+        <div>Email: sohanurconstructionltd@gmail.com | Phone: 01805-090910, 01805-090950</div>
         <h3>Worker Salary Report: ${start} to ${end}</h3>
     </div>
 
-    <table>
-        <tr>
-            <th>Worker ID</th>
+    <img src="https://i.ibb.co.com/b5F7MVpV/sohanur-Construction-logi-removebg-preview.png">
+</div>
 
-            <th>Name</th>
-            <th>Designation</th>
-            <th>Total Attend</th>
-            <th>Day Salary</th>
-            <th>Attend Salary</th>
-            <th>Total OT</th>
-            <th>OT Rate</th>
-            <th>OT Amount</th>
-            <th>Total Salary</th>
-        </tr>`;
+<table>
+<tr>
+    <th>Worker ID</th>
+    <th>Name</th>
+    <th>Designation</th>
+    <th>Total Attend</th>
+    <th>Day Salary</th>
+    <th>Attend Salary</th>
+    <th>Total OT</th>
+    <th>OT Rate</th>
+    <th>OT Amount</th>
+    <th>Total Salary</th>
+</tr>`;
 
-    let grandTotal = 0;
+let grandTotal = 0;
 
-    Object.values(workers).forEach(w => {
-        let attendSalary = w.totalAttend * w.salary;
-        let otRate = w.salary / 8;
-        let otAmount = w.totalOT * otRate;
-        let total = attendSalary + otAmount;
+Object.values(workers).forEach(w => {
+    let attendSalary = w.totalAttend * w.salary;
+    let otRate = w.salary / 8;
+    let otAmount = w.totalOT * otRate;
+    let total = attendSalary + otAmount;
 
-        grandTotal += total;
-
-        summaryHTML += `
-        <tr>
-            <td>${w.id}</td>
-            <td>${w.name}</td>
-            <td>${w.des}</td>
-            <td>${w.totalAttend}</td>
-            <td>${w.salary}</td>
-            <td>${attendSalary}</td>
-            <td>${w.totalOT}</td>
-            <td>${otRate.toFixed(2)}</td>
-            <td>${otAmount.toFixed(2)}</td>
-            <td>${total.toFixed(2)}</td>
-        </tr>`;
-    });
+    grandTotal += total;
 
     summaryHTML += `
-    </table>
+    <tr>
+        <td>${w.id}</td>
+        <td>${w.name}</td>
+        <td>${w.des}</td>
+        <td>${w.totalAttend}</td>
+        <td>${w.salary}</td>
+        <td>${attendSalary}</td>
+        <td>${w.totalOT}</td>
+        <td>${otRate.toFixed(2)}</td>
+        <td>${otAmount.toFixed(2)}</td>
+        <td>${total.toFixed(2)}</td>
+    </tr>`;
+});
 
-    <h2>Total Workers Salary: ${grandTotal.toFixed(2)} BDT</h2>
+summaryHTML += `
+</table>
 
-    <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+<h2>Total Workers Salary: ${grandTotal.toFixed(2)} BDT</h2>
 
-    <div class="footer">© Sohanur Construction & Manpower Solution</div>
+<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
 
-    </body>
-    </html>`;
+<div class="footer">© Sohanur Construction & Manpower Solution — All Rights Reserved</div>
 
-    let win = window.open("");
-    win.document.write(summaryHTML);
+</body>
+</html>`;
+
+let win = window.open("");
+win.document.write(summaryHTML);
+
 }
 </script>
 
