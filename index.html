@@ -1,330 +1,233 @@
 <!DOCTYPE html>
-<html>
+<html lang="bn">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Attendance Filter & Salary Summary</title>
 
-<!-- Google Material Icons -->
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
 <style>
     body {
-        font-family: Arial, sans-serif;
+        font-family: 'Segoe UI', Arial, sans-serif;
         padding: 20px;
+        background-color: #f8f9fa;
     }
 
     .filter-box {
-        padding: 15px;
-        background: #f1f1f1;
+        padding: 20px;
+        background: white;
         margin-bottom: 20px;
-        border-radius: 8px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+    }
+
+    .filter-box input {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
     }
 
     table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 15px;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
     }
 
     th, td {
-        padding: 8px;
-        border: 1px solid #555;
-        text-align: left;
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: center;
+        font-size: 14px;
     }
 
     th {
-        background: #e6e6e6;
+        background: #2196f3;
+        color: white;
     }
 
     .btn {
         background: #2196f3;
         color: white;
-        padding: 7px 15px;
+        padding: 10px 20px;
         border: none;
         border-radius: 6px;
         cursor: pointer;
-        margin-left: 10px;
+        font-weight: bold;
     }
 
-    .btn:hover {
-        background: #0b7dda;
-    }
+    .btn-summary { background: #4caf50; }
 </style>
 </head>
 <body>
 
-<h2><span class="material-icons">construction</span> Attendance Filter System</h2>
+<h2><span class="material-icons" style="vertical-align: middle;">construction</span> Sohanur Construction Attendance System</h2>
 
 <div class="filter-box">
-    <label><b>Start Date:</b></label>
-    <input type="date" id="startDate">
-
-    <label><b>End Date:</b></label>
-    <input type="date" id="endDate">
-
-    <label><b>Worker ID:</b></label>
-    <input type="text" id="workerID" placeholder="Optional">
-
+    <div><label><b>Start Date:</b></label><input type="date" id="startDate"></div>
+    <div><label><b>End Date:</b></label><input type="date" id="endDate"></div>
+    <div><label><b>Worker ID:</b></label><input type="text" id="workerID" placeholder="Optional"></div>
     <button class="btn" onclick="filterData()">Filter</button>
-    <button class="btn" onclick="openSummary()">Open Summary</button>
+    <button class="btn btn-summary" onclick="openSummary()">Open Summary</button>
 </div>
 
 <table id="dataTable">
     <thead>
         <tr>
-            <th>Timestamp</th>
-            <th>Worker ID</th>
-            <th>Worker Name</th>
-            <th>Designation</th>
-            <th>Day Salary</th>
-            <th>Date</th>
-            <th>Attended</th>
-            <th>OT</th>
+            <th>Timestamp</th><th>Worker ID</th><th>Name</th><th>Designation</th><th>Day Salary</th><th>Date</th><th>Attended</th><th>OT</th>
         </tr>
     </thead>
-    <tbody></tbody>
+    <tbody><tr><td colspan="8">Loading data...</td></tr></tbody>
 </table>
 
-
 <script>
-// ---------- CSV GOOGLE SHEET -------------
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeMfVC0OT9CSn4ShLoMNqfZ3pFD5RlkS2dCj1jdfjzvvvGYWOSUy5Mr-zdQ97lb96sjnoXZh5zFaCP/pub?output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeMfVC0OT9CSn4ShLoMNqfZ3pFD5RlkS2dCj1jdfjzvvvGYWOSUy5Mr-zdQ97lb96sjnoXZh5zFaCP/pub?gid=1560298674&single=true&output=csv";
+let allData = [];
 
-let data = [];
-
-// LOAD CSV
 fetch(CSV_URL)
     .then(res => res.text())
     .then(csv => {
-        data = csv.split("\n").map(r => r.split(","));
-        data.shift(); 
-        loadTable(data);
+        allData = csv.split("\n").map(r => r.split(",").map(c => c.replace(/"/g, "").trim()));
+        allData.shift();
+        loadTable(allData);
     });
 
-// TEXT DATE → REAL DATE
 function fixDate(dateText) {
     if (!dateText) return null;
-    let d = dateText.trim().split("/");
-    if (d.length !== 3) return null; 
-    return new Date(`${d[2]}-${d[1]}-${d[0]}`);  // yyyy-mm-dd
+    let d = dateText.split("/");
+    return d.length === 3 ? new Date(`${d[2]}-${d[1]}-${d[0]}`) : new Date(dateText);
 }
 
-// LOAD TABLE
 function loadTable(dataset) {
     const tbody = document.querySelector("#dataTable tbody");
     tbody.innerHTML = "";
-
     dataset.forEach(row => {
-        if (row.length < 8) return;
-
+        if (row.length < 5) return;
         let tr = document.createElement("tr");
-        row.forEach(col => {
-            let td = document.createElement("td");
-            td.textContent = col.trim();
-            tr.appendChild(td);
-        });
+        row.forEach(col => { let td = document.createElement("td"); td.textContent = col; tr.appendChild(td); });
         tbody.appendChild(tr);
     });
 }
 
-// FILTER DATA
 function filterData() {
     const start = document.getElementById("startDate").value;
     const end = document.getElementById("endDate").value;
     const worker = document.getElementById("workerID").value.trim();
-
-    let filtered = data.filter(row => {
+    let filtered = allData.filter(row => {
         let rowDate = fixDate(row[5]);
         if (!rowDate) return false;
-
-        let matchDate =
-            (!start || rowDate >= new Date(start)) &&
-            (!end || rowDate <= new Date(end));
-
-        let matchWorker =
-            (!worker || row[1] === worker);
-
-        return matchDate && matchWorker;
+        return (!start || rowDate >= new Date(start)) && (!end || rowDate <= new Date(end)) && (!worker || row[1] === worker);
     });
-
     loadTable(filtered);
 }
 
-
-// OPEN SUMMARY PAGE
 function openSummary() {
-
     const start = document.getElementById("startDate").value;
     const end = document.getElementById("endDate").value;
-
-    let filtered = data.filter(row => {
+    let filtered = allData.filter(row => {
         let rowDate = fixDate(row[5]);
-        if (!rowDate) return false;
-
-        return (!start || rowDate >= new Date(start)) &&
-               (!end || rowDate <= new Date(end));
+        return rowDate && (!start || rowDate >= new Date(start)) && (!end || rowDate <= new Date(end));
     });
 
-    let workers = {};
-
+    let summaryMap = {};
     filtered.forEach(r => {
-        let id = r[1];
-        let name = r[2];
-        let des = r[3];
-        let salary = Number(r[4]);
-        let att = Number(r[6]);
-        let ot = Number(r[7]);
-
-        if (!workers[id]) workers[id] = {
-            id, name, des, salary, totalAttend: 0, totalOT: 0
-        };
-
-        workers[id].totalAttend += att;
-        workers[id].totalOT += ot;
+        let id = r[1], name = r[2], des = r[3], salary = Number(r[4]), att = Number(r[6]), ot = Number(r[7]);
+        if (!summaryMap[id]) summaryMap[id] = { id, name, des, salary, totalAttend: 0, totalOT: 0 };
+        summaryMap[id].totalAttend += att;
+        summaryMap[id].totalOT += ot;
     });
 
+    let rowsHTML = "";
+    let grandTotal = 0;
+    Object.values(summaryMap).forEach(w => {
+        let attendSalary = w.totalAttend * w.salary;
+        let otRate = w.salary / 8;
+        let otAmount = w.totalOT * otRate;
+        let total = attendSalary + otAmount;
+        grandTotal += total;
+        rowsHTML += `<tr><td>${w.id}</td><td>${w.name}</td><td>${w.des}</td><td>${w.totalAttend}</td><td>${w.salary}</td><td>${attendSalary.toFixed(2)}</td><td>${w.totalOT}</td><td>${otRate.toFixed(2)}</td><td>${otAmount.toFixed(2)}</td><td><b>${total.toFixed(2)}</b></td></tr>`;
+    });
 
-// ====================== SUMMARY HTML ======================
-let summaryHTML = `
-<html>
-<head>
-<title>Salary Summary</title>
+    let summaryWin = window.open("", "_blank");
+    summaryWin.document.write(`
+        <html>
+        <head>
+            <title>Worker Salary Report</title>
+            <style>
+                @media print {
+                    thead { display: table-header-group; }
+                    .no-print { display: none; }
+                }
+                body { font-family: 'Arial', sans-serif; padding: 10px; color: #000; }
+                
+                /* হেডার লেআউট */
+                .company-name-top { text-align: center; font-size: 26px; font-weight: bold; margin-bottom: 5px; color: #000; }
+                
+                .header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 5px; }
+                .info-left { width: 60%; font-size: 13px; line-height: 1.4; text-align: left; }
+                .logo-right { width: 40%; text-align: right; }
+                
+                .date-center { text-align: center; margin-top: 3px; font-size: 14px; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 0; }
+                
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #000; padding: 6px; text-align: center; font-size: 12px; }
+                th { background: #f2f2f2 !important; -webkit-print-color-adjust: exact; font-weight: bold; }
+                
+                .total-box { margin-top: 15px; text-align: right; font-size: 16px; font-weight: bold; }
+                .sig-area { margin-top: 80px; display: flex; justify-content: space-between; }
+                .sig-box { border-top: 1px solid #000; width: 140px; text-align: center; font-size: 13px; }
+            </style>
+        </head>
+        <body>
+            <div class="company-name-top">SOHANUR CONSTRUCTION & MANPOWER SOLUTION</div>
+            
+            <div class="header-flex">
+                <div class="info-left">
+                    <div><b>Phone:</b> 01805-090910, 01805-090950</div>
+                    <div><b>Email:</b> sohanurconstructionltd@gmail.com</div>
+                    <div><b>Address:</b> Naogaon Sadar, Naogaon (6500)</div>
+                </div>
+                <div class="logo-right">
+                    <img src="https://scontent.fcgp4-2.fna.fbcdn.net/v/t39.30808-6/605243562_908002708456468_4393973484981407834_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=127cfc&_nc_eui2=AeGlOhCWlvFFn-rSxXAxrYeXFalWBXYMbn8VqVYFdgxuf2bdlA_oZdUCRdnWJNqTLDlCbf116j8ZfWV61JH2zPE0&_nc_ohc=HSMMN4vEXEQQ7kNvwFwWN-A&_nc_oc=Adl8C_CNbT0BY9k22YInwOHJH8AR7Ty75zFul8FTDenntPBetaua3XiaWaIGOHIW9fY&_nc_zt=23&_nc_ht=scontent.fcgp4-2.fna&_nc_gid=DQg8oaoXLgHqqk_uskL0ZQ&oh=00_AfltHh3U7DH1bGTCqOpaP3JjfncWfxnDP9JQEo7p-nvIMA&oe=6958338C" width="100">
+                </div>
+            </div>
 
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+            <div class="date-center">
+                Salary Report Period: ${start || 'Any'} To ${end || 'Any'}
+            </div>
 
-<style>
-body { font-family: Arial; padding: 20px; }
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Name</th><th>Designation</th><th>Days</th><th>Rate</th><th>Basic</th><th>OT(H)</th><th>OT Rate</th><th>OT Amt</th><th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHTML}</tbody>
+            </table>
 
-/* PRINT FIXED HEADER + FOOTER */
-@media print {
-    .header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-    }
+            <div class="total-box">
+                Grand Total Amount: ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2})} BDT
+            </div>
 
-    .footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 14px;
-        opacity: 0.7;
-    }
+            <div class="sig-area">
+                <div class="sig-box">Project engr.</div>
+                <div class="sig-box">Site Foreman</div>
+                <div class="sig-box">Director</div>
+            </div>
 
-    body { margin-top: 180px; margin-bottom: 60px; }
-}
-
-.header {
-    background: #2196f3;
-    padding: 20px;
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: 10px;
-}
-
-.header img {
-    width: 120px;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 25px;
-}
-
-th, td {
-    border: 1px solid #555;
-    padding: 8px;
-}
-
-th {
-    background: #e6e6e6;
-}
-
-.print-btn {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background: #2196f3;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-</style>
-
-</head>
-<body>
-
-<div class="header">
-    <div>
-        <h1><span class="material-icons">construction</span> Sohanur Construction & Manpower Solution</h1>
-        <div>Email: sohanurconstructionltd@gmail.com | Phone: 01805-090910, 01805-090950</div>
-        <h3>Worker Salary Report: ${start} to ${end}</h3>
-    </div>
-
-    <img src="https://i.ibb.co.com/b5F7MVpV/sohanur-Construction-logi-removebg-preview.png">
-</div>
-
-<table>
-<tr>
-    <th>Worker ID</th>
-    <th>Name</th>
-    <th>Designation</th>
-    <th>Total Attend</th>
-    <th>Day Salary</th>
-    <th>Attend Salary</th>
-    <th>Total OT</th>
-    <th>OT Rate</th>
-    <th>OT Amount</th>
-    <th>Total Salary</th>
-</tr>`;
-
-let grandTotal = 0;
-
-Object.values(workers).forEach(w => {
-    let attendSalary = w.totalAttend * w.salary;
-    let otRate = w.salary / 8;
-    let otAmount = w.totalOT * otRate;
-    let total = attendSalary + otAmount;
-
-    grandTotal += total;
-
-    summaryHTML += `
-    <tr>
-        <td>${w.id}</td>
-        <td>${w.name}</td>
-        <td>${w.des}</td>
-        <td>${w.totalAttend}</td>
-        <td>${w.salary}</td>
-        <td>${attendSalary}</td>
-        <td>${w.totalOT}</td>
-        <td>${otRate.toFixed(2)}</td>
-        <td>${otAmount.toFixed(2)}</td>
-        <td>${total.toFixed(2)}</td>
-    </tr>`;
-});
-
-summaryHTML += `
-</table>
-
-<h2>Total Workers Salary: ${grandTotal.toFixed(2)} BDT</h2>
-
-<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
-
-<div class="footer">© Sohanur Construction & Manpower Solution — All Rights Reserved</div>
-
-</body>
-</html>`;
-
-let win = window.open("");
-win.document.write(summaryHTML);
-
+            <div style="margin-top: 30px;" class="no-print">
+                 <button onclick="window.print()" style="padding:10px 20px; background:#2196f3; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">PRINT / SAVE PDF</button>
+            </div>
+        </body>
+        </html>
+    `);
 }
 </script>
-
 </body>
 </html>
